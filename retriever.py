@@ -142,7 +142,7 @@ class HybridRetriever:
             self.embed_model = SentenceTransformer(self.embedding_model_name)
             print("Embedding model loaded.")
     
-    def retrieve(self, query, top_k=5, bm25_weight=0.4, dense_weight=0.6):
+    def retrieve(self, query, top_k=5, bm25_weight=0.3, dense_weight=0.7):
         """
         Retrieve top-k documents using hybrid retrieval.
         
