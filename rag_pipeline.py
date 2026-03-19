@@ -13,7 +13,7 @@ from llm import call_llm, DEFAULT_MODEL
 
 # Configuration
 TOP_K = 7  # Number of passages to retrieve
-LLM_MODEL = "qwen/qwen3-8b"
+LLM_MODEL = "meta-llama/llama-3.1-8b-instruct"
 MAX_TOKENS = 50 # Max tokens for the answer (short and concise)
 TEMPERATURE = 0.0 # Deterministic answers
 
