@@ -1,3 +1,0 @@
-data/index/faiss.index filter=lfs diff=lfs merge=lfs -text
-data/index/bm25.pkl filter=lfs diff=lfs merge=lfs -text
-data/index/corpus_cache.pkl filter=lfs diff=lfs merge=lfs -text
