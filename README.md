@@ -1,96 +1,89 @@
-# RAG System for UC Berkeley EECS QA
+# RAG Question-Answering Pipeline
 
-## CS288 Assignment 3 - Retrieval Augmented Generation
+A retrieval-augmented generation (RAG) system for answering questions about UC Berkeley EECS. Combines hybrid sparse/dense retrieval with LLM-based answer generation to achieve high-accuracy QA over a large unstructured corpus.
 
-### Architecture
+## Architecture
 
 ```
-Question → [BM25 + Dense Retriever] → Top-K Passages → [LLM Generator] → Answer
+Question → [Hybrid BM25 + Dense Retriever] → Top-K Passages → [LLM Generator] → Answer
 ```
 
-**Components:**
-- **Retriever** (`retriever.py`): Hybrid BM25 + Dense (sentence-transformers/all-MiniLM-L6-v2 + FAISS)
-- **Generator** (`rag_pipeline.py`): Prompt construction + LLM call via `llm.py`
-- **Evaluation** (`evaluate.py`): Exact Match + F1 metrics
-- **Crawler** (`crawler.py`): BFS crawl of eecs.berkeley.edu (not used — pre-built corpus provided)
-- **Data Processor** (`data_processor.py`): HTML → clean text chunks (not used — pre-built corpus provided)
+The pipeline has three stages:
 
-### Quick Start
+1. **Retrieval** — A hybrid retriever combines BM25 (lexical) and dense embedding search (semantic) over ~67K text chunks, scoring candidates with a weighted combination to capture both exact keyword matches and meaning-level similarity.
 
-You can run the entire pipeline (build index + answer questions + evaluate) with a single command:
+2. **Generation** — Retrieved passages are injected into a structured prompt and sent to an LLM (Qwen 2.5 7B Instruct via OpenRouter) for answer generation.
+
+3. **Evaluation** — Answers are scored against references using Exact Match (EM) and token-level F1.
+
+## Key Design Choices
+
+| Component | Choice | Rationale |
+|-----------|--------|-----------|
+| Embedding model | all-MiniLM-L6-v2 (22M params) | Fast inference, strong retrieval quality |
+| Sparse retrieval | BM25 | Reliable lexical matching for entity-heavy queries |
+| Dense retrieval | FAISS (L2) | Efficient nearest-neighbor search over embeddings |
+| Hybrid weights | BM25 (0.4) + Dense (0.6) | Empirically tuned for best F1 |
+| Top-K | 10 passages | Balances context richness vs. prompt length |
+| LLM | Qwen 2.5 7B Instruct | Strong instruction-following for extractive QA |
+
+## Quick Start
 
 ```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run full pipeline (build index + answer questions + evaluate)
 bash run.sh val_QA/val.jsonl data/predictions.txt
 ```
 
 This will automatically:
-1. Build BM25 + FAISS indices if they don't exist yet
-2. Read questions and reference answers from `val.jsonl`
-3. Generate predictions via the RAG pipeline
-4. Run evaluation (Exact Match + F1)
+1. Build BM25 + FAISS indices if they don't exist
+2. Retrieve and generate answers for each question
+3. Print EM and F1 scores
 
-### Step-by-Step Setup
+### Step-by-Step
 
-1. **Install dependencies:**
 ```bash
-pip install -r requirements.txt
-```
-
-2. **Build index (uses pre-built corpus in `data/`):**
-```bash
+# 1. Build retrieval indices
 python3 build.py
-```
 
-3. **Run on questions:**
-```bash
+# 2. Run RAG pipeline on questions
 python3 rag_pipeline.py val_QA/val.jsonl data/predictions.txt
-```
 
-4. **Evaluate:**
-```bash
+# 3. Evaluate predictions
 python3 evaluate.py data/predictions.txt data/predictions_references.json
 ```
 
-### Key Design Choices
-
-| Component | Choice | Rationale |
-|-----------|--------|-----------|
-| Corpus | Pre-built chunked corpus (7 JSONL parts) | Crawling and processing already done |
-| Embedding model | all-MiniLM-L6-v2 (22M params) | Fast, effective, well under 400M limit |
-| Retrieval | Hybrid BM25 (0.4) + Dense (0.6) | BM25 for exact matches, dense for semantic |
-| Top-K | 5 passages | Sufficient context without overwhelming LLM |
-| LLM | qwen/qwen-2.5-7b-instruct | Good instruction following for QA |
-
-### File Structure
+## Project Structure
 
 ```
-rag_system/
-├── run.sh                 # Entrypoint (auto-builds index + runs pipeline + evaluates)
-├── build.py               # Build retrieval indices
-├── rag_pipeline.py        # Main RAG pipeline
-├── retriever.py           # Hybrid BM25 + Dense retriever
-├── llm.py                 # LLM API wrapper (DO NOT MODIFY)
-├── evaluate.py            # EM + F1 evaluation
-├── crawler.py             # Web crawler (not used)
-├── data_processor.py      # HTML cleaning and chunking (not used)
-├── README.md
+.
+├── rag_pipeline.py        # Main RAG pipeline — retrieval + prompt + generation
+├── retriever.py           # Hybrid BM25 + dense retriever with FAISS
+├── build.py               # Index construction (BM25 + FAISS)
+├── llm.py                 # LLM API wrapper (OpenRouter)
+├── evaluate.py            # Exact Match + F1 evaluation
+├── run.sh                 # One-command entrypoint
+├── requirements.txt
+├── report.pdf             # Detailed writeup with ablation studies
 ├── data/
-│   ├── eecs_chunks_v3_part_1.jsonl   # Pre-built corpus (part 1 of 7)
-│   ├── eecs_chunks_v3_part_2.jsonl
-│   ├── ...
-│   ├── eecs_chunks_v3_part_7.jsonl
-│   └── index/                         # Auto-generated indices
+│   ├── eecs_chunks_v3_part_*.jsonl   # Corpus (~67K chunks across 7 files)
+│   └── index/                         # Auto-generated retrieval indices
 │       ├── bm25.pkl
 │       ├── faiss.index
 │       └── corpus_cache.pkl
 └── val_QA/
-    └── val.jsonl          # Validation questions + answers
+    └── val.jsonl          # 102 validation questions with reference answers
 ```
 
-### Constraints (from assignment)
+## Results
 
-- Embedding model: ≤ 400MB
-- LLM: Must use OpenRouter, allowed models only
-- Runtime: ≤ 0.6s per question average
-- Environment: Python 3.10.12, 4GB RAM, no GPU
-- `llm.py` must not be modified
+Evaluated on 102 validation questions:
+
+| Metric | Score |
+|--------|-------|
+| Exact Match | See `report.pdf` |
+| F1 | See `report.pdf` |
+
+Ablation studies on retrieval strategy (sparse-only, dense-only, hybrid) and top-K values are documented in the report.
