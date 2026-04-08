@@ -87,3 +87,4 @@ Evaluated on 102 validation questions:
 | F1 | See `report.pdf` |
 
 Ablation studies on retrieval strategy (sparse-only, dense-only, hybrid) and top-K values are documented in the report.
+
